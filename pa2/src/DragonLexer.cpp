@@ -178,6 +178,7 @@ Token DragonLexer::NUMBER() {
       expPart += static_cast<char>(peek);
       advance();
     }
+    int expStartPos = pos; // 记录指数数字部分的起始位置
     bool expLastIsDigit = false;
     bool expHasDigit = false;
     while (std::isdigit(peek) || (peek == '\'' && expLastIsDigit)) {
@@ -193,6 +194,13 @@ Token DragonLexer::NUMBER() {
       expLastIsDigit = true;
       expHasDigit = true;
     }
+
+    // 如果指数部分以单引号结尾，则该单引号无效，需要回退
+    if (!expPart.empty() && expPart.back() == '\'' && !std::isdigit(peek)) {
+        expPart.pop_back();
+        resetPos(pos - 1);
+    }
+
     if (expHasDigit) {
       hasExp = true;
       num += static_cast<char>(input[savePos]); // 加入 'e' 或 'E'
@@ -202,7 +210,7 @@ Token DragonLexer::NUMBER() {
       resetPos(savePos);
     }
   }
-
+  
   if (hasExp) {
     return Token(TokenType::SCI, num, startLine);
   } else if (hasDot) {
