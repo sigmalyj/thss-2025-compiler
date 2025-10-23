@@ -1,4 +1,5 @@
 # Prerequisites
+*.zip
 *.d
 
 # Compiled Object files

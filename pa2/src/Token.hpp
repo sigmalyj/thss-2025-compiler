@@ -20,8 +20,8 @@ enum class TokenType {
   COMMA, SEMI,
 
   PLUS, MINUS, MUL, DIV,
-  DOT
-  // TODO: add more
+  DOT,
+  SQUOTE
 };
 
 struct Token {
