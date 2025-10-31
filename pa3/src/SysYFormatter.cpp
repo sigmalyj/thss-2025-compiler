@@ -4,7 +4,8 @@
 #include <string>
 #include <algorithm>
 #include <any>
-#include <iostream> // 添加用于调试输出
+
+// ==================== 工具函数 ====================
 
 // 添加缩进
 void SysYFormatter::addIndent() {
@@ -34,16 +35,34 @@ std::string SysYFormatter::getFormattedCode() {
     return formattedCode.str();
 }
 
-// 调试函数：输出当前格式化代码
-void SysYFormatter::printDebugInfo(const std::string &message) {
-    std::cerr << "DEBUG: " << message << std::endl;
-    std::cerr << "Current formatted code:" << std::endl;
-    std::cerr << formattedCode.str() << std::endl;
+// ==================== 起始规则 ====================
+
+// 访问编译单元(最顶层)
+std::any SysYFormatter::visitCompUnit(SysYParser::CompUnitContext *ctx) {
+    for (auto *item : ctx->children) {
+        if (auto *decl = dynamic_cast<SysYParser::DeclContext*>(item)) {
+            visit(decl);
+        } else if (auto *funcDef = dynamic_cast<SysYParser::FuncDefContext*>(item)) {
+            visit(funcDef);
+        }
+    }
+    return nullptr;
+}
+
+// ==================== 声明规则 ====================
+
+// 访问声明
+std::any SysYFormatter::visitDecl(SysYParser::DeclContext *ctx) {
+    if (ctx->constDecl()) {
+        visit(ctx->constDecl());
+    } else if (ctx->varDecl()) {
+        visit(ctx->varDecl());
+    }
+    return nullptr;
 }
 
 // 访问常量声明
 std::any SysYFormatter::visitConstDecl(SysYParser::ConstDeclContext *ctx) {
-    printDebugInfo("Visiting ConstDecl");
     addIndent();
     formattedCode << "const ";
     visit(ctx->bType());
@@ -63,14 +82,19 @@ std::any SysYFormatter::visitConstDecl(SysYParser::ConstDeclContext *ctx) {
     return nullptr;
 }
 
+// 访问基本类型
+std::any SysYFormatter::visitBType(SysYParser::BTypeContext *ctx) {
+    formattedCode << "int";
+    return nullptr;
+}
+
 // 访问常量定义
 std::any SysYFormatter::visitConstDef(SysYParser::ConstDefContext *ctx) {
-    printDebugInfo("Visiting ConstDef");
     formattedCode << ctx->IDENT()->getText();
     if (!ctx->constExp().empty()) {
-        for (size_t i = 0; i < ctx->constExp().size() - 1; ++i) {
+        for (auto *exp : ctx->constExp()) {
             formattedCode << "[";
-            visit(ctx->constExp(i));
+            visit(exp);
             formattedCode << "]";
         }
     }
@@ -81,7 +105,6 @@ std::any SysYFormatter::visitConstDef(SysYParser::ConstDefContext *ctx) {
 
 // 访问常量初始化值
 std::any SysYFormatter::visitConstInitVal(SysYParser::ConstInitValContext *ctx) {
-    printDebugInfo("Visiting ConstInitVal");
     if (ctx->constExp()) {
         visit(ctx->constExp());
     } else {
@@ -99,31 +122,11 @@ std::any SysYFormatter::visitConstInitVal(SysYParser::ConstInitValContext *ctx) 
     return nullptr;
 }
 
-std::any SysYFormatter::visitInitVal(SysYParser::InitValContext *ctx) {
-    printDebugInfo("Visiting InitVal");
-    if (ctx->exp()) {
-        visit(ctx->exp());
-    } else {
-        formattedCode << "{";
-        bool isFirst = true;
-        for (auto *val : ctx->initVal()) {
-            if (!isFirst) {
-                formattedCode << ", ";
-            }
-            isFirst = false;
-            visit(val);
-        }
-        formattedCode << "}";
-    }
-    return nullptr;
-}
-
 // 访问变量声明
 std::any SysYFormatter::visitVarDecl(SysYParser::VarDeclContext *ctx) {
-    printDebugInfo("Visiting VarDecl");
     addIndent();
     visit(ctx->bType());
-    //addSpace();
+    addSpace();
 
     bool isFirstVarDef = true;
     for (auto *def : ctx->varDef()) {
@@ -141,7 +144,6 @@ std::any SysYFormatter::visitVarDecl(SysYParser::VarDeclContext *ctx) {
 
 // 访问变量定义
 std::any SysYFormatter::visitVarDef(SysYParser::VarDefContext *ctx) {
-    printDebugInfo("Visiting VarDef");
     formattedCode << ctx->IDENT()->getText();
     if (!ctx->constExp().empty()) {
         for (auto *exp : ctx->constExp()) {
@@ -157,10 +159,87 @@ std::any SysYFormatter::visitVarDef(SysYParser::VarDefContext *ctx) {
     return nullptr;
 }
 
+// 访问初始化值
+std::any SysYFormatter::visitInitVal(SysYParser::InitValContext *ctx) {
+    if (ctx->exp()) {
+        visit(ctx->exp());
+    } else {
+        formattedCode << "{";
+        bool isFirst = true;
+        for (auto *val : ctx->initVal()) {
+            if (!isFirst) {
+                formattedCode << ", ";
+            }
+            isFirst = false;
+            visit(val);
+        }
+        formattedCode << "}";
+    }
+    return nullptr;
+}
+
+// ==================== 函数定义规则 ====================
+
+// 访问函数定义
+std::any SysYFormatter::visitFuncDef(SysYParser::FuncDefContext *ctx) {
+    addIndent();
+    visit(ctx->funcType());
+    addSpace();
+    formattedCode << ctx->IDENT()->getText() << "(";
+    if (ctx->funcFParams()) {
+        visit(ctx->funcFParams());
+    }
+    formattedCode << ") ";
+    visit(ctx->block());
+    return nullptr;
+}
+
+// 访问函数类型
+std::any SysYFormatter::visitFuncType(SysYParser::FuncTypeContext *ctx) {
+    if (ctx->VOID()) {
+        formattedCode << "void";
+    } else if (ctx->INT()) {
+        formattedCode << "int";
+    }
+    return nullptr;
+}
+
+// 访问函数形参列表
+std::any SysYFormatter::visitFuncFParams(SysYParser::FuncFParamsContext *ctx) {
+    bool isFirst = true;
+    for (auto *param : ctx->funcFParam()) {
+        if (!isFirst) {
+            formattedCode << ", ";
+        }
+        isFirst = false;
+        visit(param);
+    }
+    return nullptr;
+}
+
+// 访问函数形参
+std::any SysYFormatter::visitFuncFParam(SysYParser::FuncFParamContext *ctx) {
+    visit(ctx->bType());
+    addSpace();
+    formattedCode << ctx->IDENT()->getText();
+    
+    // 处理数组参数
+    if (ctx->L_BRACKT().size() > 0) {
+        formattedCode << "[]";
+        // 处理多维数组的其他维度
+        for (size_t i = 1; i < ctx->L_BRACKT().size(); ++i) {
+            formattedCode << "[";
+            visit(ctx->exp(i - 1));
+            formattedCode << "]";
+        }
+    }
+    return nullptr;
+}
+
+// ==================== 代码块规则 ====================
+
 // 访问代码块
 std::any SysYFormatter::visitBlock(SysYParser::BlockContext *ctx) {
-    printDebugInfo("Visiting Block");
-    addIndent();
     if (ctx->blockItem().empty()) {
         formattedCode << "{}";
         addNewline();
@@ -182,9 +261,20 @@ std::any SysYFormatter::visitBlock(SysYParser::BlockContext *ctx) {
     return nullptr;
 }
 
+// 访问块项
+std::any SysYFormatter::visitBlockItem(SysYParser::BlockItemContext *ctx) {
+    if (ctx->decl()) {
+        visit(ctx->decl());
+    } else if (ctx->stmt()) {
+        visit(ctx->stmt());
+    }
+    return nullptr;
+}
+
+// ==================== 语句规则 ====================
+
 // 访问语句
 std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
-    printDebugInfo("Visiting Stmt");
     addIndent();
     if (ctx->block()) {
         visit(ctx->block());
@@ -208,15 +298,9 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
         formattedCode << ") ";
         visit(ctx->stmt(0));
         if (ctx->ELSE()) {
-            if (ctx->stmt(1)->IF()) {
-                formattedCode << "else if (";
-                visit(ctx->stmt(1)->cond());
-                formattedCode << ") ";
-                visit(ctx->stmt(1)->stmt(0));
-            } else {
-                formattedCode << "else ";
-                visit(ctx->stmt(1));
-            }
+            addIndent();
+            formattedCode << "else ";
+            visit(ctx->stmt(1));
         }
     } else if (ctx->WHILE()) {
         formattedCode << "while (";
@@ -233,55 +317,60 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
         visit(ctx->exp());
         formattedCode << ";";
         addNewline();
+    } else {
+        formattedCode << ";";
+        addNewline();
     }
     return nullptr;
 }
+
+// ==================== 表达式规则 ====================
 
 // 访问表达式
 std::any SysYFormatter::visitExp(SysYParser::ExpContext *ctx) {
-    printDebugInfo("Visiting Exp");
     visit(ctx->addExp());
     return nullptr;
 }
 
-// 在 visitExp 之后添加：
-std::any SysYFormatter::visitConstExp(SysYParser::ConstExpContext *ctx) {
-    printDebugInfo("Visiting ConstExp");
-    visit(ctx->addExp());
+// 访问条件表达式
+std::any SysYFormatter::visitCond(SysYParser::CondContext *ctx) {
+    visit(ctx->lOrExp());
     return nullptr;
 }
 
-// 添加其他关键的表达式访问函数：
-std::any SysYFormatter::visitAddExp(SysYParser::AddExpContext *ctx) {
-    printDebugInfo("Visiting AddExp");
-    if (ctx->mulExp()) {
-        visit(ctx->mulExp());
-    } else {
-        visit(ctx->addExp());
-        formattedCode << " " << (ctx->PLUS() ? "+" : "-") << " ";
-        visit(ctx->mulExp());
+// 访问左值
+std::any SysYFormatter::visitLVal(SysYParser::LValContext *ctx) {
+    formattedCode << ctx->IDENT()->getText();
+    for (auto *exp : ctx->exp()) {
+        formattedCode << "[";
+        visit(exp);
+        formattedCode << "]";
     }
     return nullptr;
 }
 
-std::any SysYFormatter::visitMulExp(SysYParser::MulExpContext *ctx) {
-    printDebugInfo("Visiting MulExp");
-    if (ctx->unaryExp()) {
-        visit(ctx->unaryExp());
-    } else {
-        visit(ctx->mulExp());
-        formattedCode << " ";
-        if (ctx->MUL()) formattedCode << "*";
-        else if (ctx->DIV()) formattedCode << "/";
-        else formattedCode << "%";
-        formattedCode << " ";
-        visit(ctx->unaryExp());
+// 访问基本表达式
+std::any SysYFormatter::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx) {
+    if (ctx->L_PAREN()) {
+        formattedCode << "(";
+        visit(ctx->exp());
+        formattedCode << ")";
+    } else if (ctx->lVal()) {
+        visit(ctx->lVal());
+    } else if (ctx->number()) {
+        visit(ctx->number());
     }
     return nullptr;
 }
 
+// 访问数字
+std::any SysYFormatter::visitNumber(SysYParser::NumberContext *ctx) {
+    formattedCode << ctx->INTEGER_CONST()->getText();
+    return nullptr;
+}
+
+// 访问一元表达式
 std::any SysYFormatter::visitUnaryExp(SysYParser::UnaryExpContext *ctx) {
-    printDebugInfo("Visiting UnaryExp");
     if (ctx->primaryExp()) {
         visit(ctx->primaryExp());
     } else if (ctx->IDENT()) {
@@ -297,43 +386,117 @@ std::any SysYFormatter::visitUnaryExp(SysYParser::UnaryExpContext *ctx) {
     return nullptr;
 }
 
-// 访问条件表达式
-std::any SysYFormatter::visitCond(SysYParser::CondContext *ctx) {
-    printDebugInfo("Visiting Cond");
-    visit(ctx->lOrExp());
+// 访问一元运算符
+std::any SysYFormatter::visitUnaryOp(SysYParser::UnaryOpContext *ctx) {
+    if (ctx->PLUS()) {
+        formattedCode << "+";
+    } else if (ctx->MINUS()) {
+        formattedCode << "-";
+    } else if (ctx->NOT()) {
+        formattedCode << "!";
+    }
     return nullptr;
 }
 
-// 访问左值
-std::any SysYFormatter::visitLVal(SysYParser::LValContext *ctx) {
-    printDebugInfo("Visiting LVal");
-    formattedCode << ctx->IDENT()->getText();
+// 访问函数实参列表
+std::any SysYFormatter::visitFuncRParams(SysYParser::FuncRParamsContext *ctx) {
+    bool isFirst = true;
     for (auto *exp : ctx->exp()) {
-        formattedCode << "[";
+        if (!isFirst) {
+            formattedCode << ", ";
+        }
+        isFirst = false;
         visit(exp);
-        formattedCode << "]";
     }
     return nullptr;
 }
 
-// 访问基本表达式
-std::any SysYFormatter::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx) {
-    printDebugInfo("Visiting PrimaryExp");
-    if (ctx->L_PAREN()) {
-        formattedCode << "(";
-        visit(ctx->exp());
-        formattedCode << ")";
-    } else if (ctx->lVal()) {
-        visit(ctx->lVal());
-    } else if (ctx->number()) {
-        visit(ctx->number());
+// 访问乘除表达式
+std::any SysYFormatter::visitMulExp(SysYParser::MulExpContext *ctx) {
+    if (ctx->unaryExp()) {
+        visit(ctx->unaryExp());
+    } else {
+        visit(ctx->mulExp());
+        formattedCode << " ";
+        if (ctx->MUL()) formattedCode << "*";
+        else if (ctx->DIV()) formattedCode << "/";
+        else formattedCode << "%";
+        formattedCode << " ";
+        visit(ctx->unaryExp());
     }
     return nullptr;
 }
 
-// 访问数字
-std::any SysYFormatter::visitNumber(SysYParser::NumberContext *ctx) {
-    printDebugInfo("Visiting Number");
-    formattedCode << ctx->INTEGER_CONST()->getText();
+// 访问加减表达式
+std::any SysYFormatter::visitAddExp(SysYParser::AddExpContext *ctx) {
+    if (ctx->mulExp()) {
+        visit(ctx->mulExp());
+    } else {
+        visit(ctx->addExp());
+        formattedCode << " " << (ctx->PLUS() ? "+" : "-") << " ";
+        visit(ctx->mulExp());
+    }
+    return nullptr;
+}
+
+// 访问关系表达式
+std::any SysYFormatter::visitRelExp(SysYParser::RelExpContext *ctx) {
+    if (ctx->addExp()) {
+        visit(ctx->addExp());
+    } else {
+        visit(ctx->relExp());
+        formattedCode << " ";
+        if (ctx->LT()) formattedCode << "<";
+        else if (ctx->GT()) formattedCode << ">";
+        else if (ctx->LE()) formattedCode << "<=";
+        else formattedCode << ">=";
+        formattedCode << " ";
+        visit(ctx->addExp());
+    }
+    return nullptr;
+}
+
+// 访问相等表达式
+std::any SysYFormatter::visitEqExp(SysYParser::EqExpContext *ctx) {
+    if (ctx->relExp()) {
+        visit(ctx->relExp());
+    } else {
+        visit(ctx->eqExp());
+        formattedCode << " ";
+        if (ctx->EQ()) formattedCode << "==";
+        else formattedCode << "!=";
+        formattedCode << " ";
+        visit(ctx->relExp());
+    }
+    return nullptr;
+}
+
+// 访问逻辑与表达式
+std::any SysYFormatter::visitLAndExp(SysYParser::LAndExpContext *ctx) {
+    if (ctx->eqExp()) {
+        visit(ctx->eqExp());
+    } else {
+        visit(ctx->lAndExp());
+        formattedCode << " && ";
+        visit(ctx->eqExp());
+    }
+    return nullptr;
+}
+
+// 访问逻辑或表达式
+std::any SysYFormatter::visitLOrExp(SysYParser::LOrExpContext *ctx) {
+    if (ctx->lAndExp()) {
+        visit(ctx->lAndExp());
+    } else {
+        visit(ctx->lOrExp());
+        formattedCode << " || ";
+        visit(ctx->lAndExp());
+    }
+    return nullptr;
+}
+
+// 访问常量表达式
+std::any SysYFormatter::visitConstExp(SysYParser::ConstExpContext *ctx) {
+    visit(ctx->addExp());
     return nullptr;
 }

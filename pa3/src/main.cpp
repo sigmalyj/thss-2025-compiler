@@ -31,16 +31,11 @@ int main(int argc, const char* argv[]) {
     // 获取语法分析树
     tree::ParseTree *tree = parser.compUnit();
 
-    // 输出语法分析树
-    // std::cout << "Parse Tree:" << std::endl;
-    // std::cout << tree->toStringTree(&parser) << std::endl;
-
     // 创建格式化器并访问语法树
     SysYFormatter formatter;
     formatter.visit(tree);
 
     // 输出格式化后的代码
-    std::cout << "\nFormatted Code:" << std::endl;
     std::cout << formatter.getFormattedCode() << std::endl;
 
     return 0;

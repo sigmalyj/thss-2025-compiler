@@ -29,46 +29,48 @@ public:
 
     void printDebugInfo(const std::string &message);
 
-    // 访问常量初始化值
+    // 起始规则
+    std::any visitCompUnit(SysYParser::CompUnitContext *ctx) override;
+
+    // 声明规则
+    std::any visitDecl(SysYParser::DeclContext *ctx) override;
+    std::any visitConstDecl(SysYParser::ConstDeclContext *ctx) override;
+    std::any visitBType(SysYParser::BTypeContext *ctx) override;
+    std::any visitConstDef(SysYParser::ConstDefContext *ctx) override;
     std::any visitConstInitVal(SysYParser::ConstInitValContext *ctx) override;
-    // 访问初始化值
+    std::any visitVarDecl(SysYParser::VarDeclContext *ctx) override;
+    std::any visitVarDef(SysYParser::VarDefContext *ctx) override;
     std::any visitInitVal(SysYParser::InitValContext *ctx) override;
 
-    // 访问常量声明
-    std::any visitConstDecl(SysYParser::ConstDeclContext *ctx) override;
-    // 访问常量定义
-    std::any visitConstDef(SysYParser::ConstDefContext *ctx) override;
+    // 函数定义规则
+    std::any visitFuncDef(SysYParser::FuncDefContext *ctx) override;
+    std::any visitFuncType(SysYParser::FuncTypeContext *ctx) override;
+    std::any visitFuncFParams(SysYParser::FuncFParamsContext *ctx) override;
+    std::any visitFuncFParam(SysYParser::FuncFParamContext *ctx) override;
 
-    // 访问变量声明
-    std::any visitVarDecl(SysYParser::VarDeclContext *ctx) override;
-
-    // 访问变量定义
-    std::any visitVarDef(SysYParser::VarDefContext *ctx) override;
-
-    // 访问代码块
+    // 代码块规则
     std::any visitBlock(SysYParser::BlockContext *ctx) override;
+    std::any visitBlockItem(SysYParser::BlockItemContext *ctx) override;
 
-    // 访问语句
+    // 语句规则
     std::any visitStmt(SysYParser::StmtContext *ctx) override;
 
-    // 访问表达式
+    // 表达式规则
     std::any visitExp(SysYParser::ExpContext *ctx) override;
-    
-    std::any visitConstExp(SysYParser::ConstExpContext *ctx) override;
-    std::any visitAddExp(SysYParser::AddExpContext *ctx) override;
-    std::any visitMulExp(SysYParser::MulExpContext *ctx) override;
-    std::any visitUnaryExp(SysYParser::UnaryExpContext *ctx) override;
-    // 访问条件表达式
     std::any visitCond(SysYParser::CondContext *ctx) override;
-
-    // 访问左值
     std::any visitLVal(SysYParser::LValContext *ctx) override;
-
-    // 访问基本表达式
     std::any visitPrimaryExp(SysYParser::PrimaryExpContext *ctx) override;
-
-    // 访问数字
     std::any visitNumber(SysYParser::NumberContext *ctx) override;
+    std::any visitUnaryExp(SysYParser::UnaryExpContext *ctx) override;
+    std::any visitUnaryOp(SysYParser::UnaryOpContext *ctx) override;
+    std::any visitFuncRParams(SysYParser::FuncRParamsContext *ctx) override;
+    std::any visitMulExp(SysYParser::MulExpContext *ctx) override;
+    std::any visitAddExp(SysYParser::AddExpContext *ctx) override;
+    std::any visitRelExp(SysYParser::RelExpContext *ctx) override;
+    std::any visitEqExp(SysYParser::EqExpContext *ctx) override;
+    std::any visitLAndExp(SysYParser::LAndExpContext *ctx) override;
+    std::any visitLOrExp(SysYParser::LOrExpContext *ctx) override;
+    std::any visitConstExp(SysYParser::ConstExpContext *ctx) override;
 };
 
 #endif // SYSYFORMATTER_H
