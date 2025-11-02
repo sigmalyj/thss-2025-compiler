@@ -196,7 +196,12 @@ std::any SysYFormatter::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 
 // 访问函数类型
 std::any SysYFormatter::visitFuncType(SysYParser::FuncTypeContext *ctx) {
-    addNewline();
+    // 只有当缓冲区非空时才添加换行（避免第一个函数前出现空行）
+    std::string buf = formattedCode.str();
+    if (!buf.empty()) {
+        addNewline();
+    }
+    
     if (ctx->VOID()) {
         formattedCode << "void";
     } else if (ctx->INT()) {
