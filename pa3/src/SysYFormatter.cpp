@@ -239,25 +239,33 @@ std::any SysYFormatter::visitFuncFParam(SysYParser::FuncFParamContext *ctx) {
 
 // ==================== 代码块规则 ====================
 
-// 访问代码块
 std::any SysYFormatter::visitBlock(SysYParser::BlockContext *ctx) {
+    // 判断当前是否在行首（缓冲为空或最后一个字符为换行）
+    std::string buf = formattedCode.str();
+    bool atLineStart = buf.empty() || buf.back() == '\n';
+
+    // 在行首时先添加缩进（若不是行首，例如 "if (...) " 后直接跟 "{", 则不加）
+    if (atLineStart) addIndent();
+
+    formattedCode << "{";
+    addNewline();
+
+    // 空块处理：为了与非空块一致，临时调整缩进后再打印右括号
     if (ctx->blockItem().empty()) {
-        formattedCode << "{";
-        addNewline();
+        ++indentLevel;
+        --indentLevel;
+        addIndent();
         formattedCode << "}";
         addNewline();
         return nullptr;
     }
 
-    formattedCode << "{";
-    addNewline();
     ++indentLevel;
-
     for (auto *item : ctx->blockItem()) {
         visit(item);
     }
-
     --indentLevel;
+
     addIndent();
     formattedCode << "}";
     addNewline();
