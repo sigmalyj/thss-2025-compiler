@@ -196,6 +196,7 @@ std::any SysYFormatter::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 
 // 访问函数类型
 std::any SysYFormatter::visitFuncType(SysYParser::FuncTypeContext *ctx) {
+    addNewline();
     if (ctx->VOID()) {
         formattedCode << "void";
     } else if (ctx->INT()) {
@@ -241,7 +242,9 @@ std::any SysYFormatter::visitFuncFParam(SysYParser::FuncFParamContext *ctx) {
 // 访问代码块
 std::any SysYFormatter::visitBlock(SysYParser::BlockContext *ctx) {
     if (ctx->blockItem().empty()) {
-        formattedCode << "{}";
+        formattedCode << "{";
+        addNewline();
+        formattedCode << "}";
         addNewline();
         return nullptr;
     }
