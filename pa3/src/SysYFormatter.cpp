@@ -324,11 +324,38 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
                 addSpace();
                 visit(elseStmt);
             } else if (elseStmt->IF()) {
+                // 不直接 visit(elseStmt)，改为内联处理 "else if"，
+                // 以避免 visit(elseStmt) 内部再次 addIndent() 导致多余缩进
                 addSpace();
-                // else if 的情况，不需要缩进，因为 if 语句会自己处理
-                --indentLevel; // 临时减少缩进级别
-                visit(elseStmt);
-                ++indentLevel; // 恢复缩进级别
+                formattedCode << "if (";
+                visit(elseStmt->cond());
+                formattedCode << ")";
+                auto *thenStmt2 = elseStmt->stmt(0);
+                if (thenStmt2->block()) {
+                    addSpace();
+                    visit(thenStmt2);
+                } else {
+                    addNewline();
+                    ++indentLevel;
+                    visit(thenStmt2);
+                    --indentLevel;
+                }
+                // 若内层 if 自带 else，则递归或按需处理
+                if (elseStmt->ELSE()) {
+                    // 将内层 else 同样按上面的方式处理（可递归实现）
+                    addIndent();
+                    formattedCode << "else";
+                    auto *innerElse = elseStmt->stmt(1);
+                    if (innerElse->block()) {
+                        addSpace();
+                        visit(innerElse);
+                    } else {
+                        addNewline();
+                        ++indentLevel;
+                        visit(innerElse);
+                        --indentLevel;
+                    }
+                }
             } else {
                 addNewline();
                 ++indentLevel;
@@ -336,7 +363,7 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
                 --indentLevel;
             }
         }
-    } else if (ctx->WHILE()) {
+        } else if (ctx->WHILE()) {
         addIndent();
         formattedCode << "while (";
         visit(ctx->cond());
