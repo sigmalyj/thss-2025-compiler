@@ -275,16 +275,18 @@ std::any SysYFormatter::visitBlockItem(SysYParser::BlockItemContext *ctx) {
 
 // 访问语句
 std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
-    addIndent();
     if (ctx->block()) {
+        // block 自己会处理缩进
         visit(ctx->block());
     } else if (ctx->lVal()) {
+        addIndent();
         visit(ctx->lVal());
         formattedCode << " = ";
         visit(ctx->exp());
         formattedCode << ";";
         addNewline();
     } else if (ctx->RETURN()) {
+        addIndent();
         formattedCode << "return";
         if (ctx->exp()) {
             addSpace();
@@ -293,31 +295,75 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
         formattedCode << ";";
         addNewline();
     } else if (ctx->IF()) {
+        addIndent();
         formattedCode << "if (";
         visit(ctx->cond());
-        formattedCode << ") ";
-        visit(ctx->stmt(0));
+        formattedCode << ")";
+        
+        // 处理 if 后的语句
+        auto *thenStmt = ctx->stmt(0);
+        if (thenStmt->block()) {
+            addSpace();
+            visit(thenStmt);
+        } else {
+            addNewline();
+            ++indentLevel;
+            visit(thenStmt);
+            --indentLevel;
+        }
+        
+        // 处理 else 分支
         if (ctx->ELSE()) {
             addIndent();
-            formattedCode << "else ";
-            visit(ctx->stmt(1));
+            formattedCode << "else";
+            auto *elseStmt = ctx->stmt(1);
+            if (elseStmt->block()) {
+                addSpace();
+                visit(elseStmt);
+            } else if (elseStmt->IF()) {
+                addSpace();
+                // else if 的情况，不需要缩进，因为 if 语句会自己处理
+                --indentLevel; // 临时减少缩进级别
+                visit(elseStmt);
+                ++indentLevel; // 恢复缩进级别
+            } else {
+                addNewline();
+                ++indentLevel;
+                visit(elseStmt);
+                --indentLevel;
+            }
         }
     } else if (ctx->WHILE()) {
+        addIndent();
         formattedCode << "while (";
         visit(ctx->cond());
-        formattedCode << ") ";
-        visit(ctx->stmt(0));
+        formattedCode << ")";
+        
+        auto *loopStmt = ctx->stmt(0);
+        if (loopStmt->block()) {
+            addSpace();
+            visit(loopStmt);
+        } else {
+            addNewline();
+            ++indentLevel;
+            visit(loopStmt);
+            --indentLevel;
+        }
     } else if (ctx->BREAK()) {
+        addIndent();
         formattedCode << "break;";
         addNewline();
     } else if (ctx->CONTINUE()) {
+        addIndent();
         formattedCode << "continue;";
         addNewline();
     } else if (ctx->exp()) {
+        addIndent();
         visit(ctx->exp());
         formattedCode << ";";
         addNewline();
     } else {
+        addIndent();
         formattedCode << ";";
         addNewline();
     }
@@ -413,9 +459,8 @@ std::any SysYFormatter::visitFuncRParams(SysYParser::FuncRParamsContext *ctx) {
 
 // 访问乘除表达式
 std::any SysYFormatter::visitMulExp(SysYParser::MulExpContext *ctx) {
-    if (ctx->unaryExp()) {
-        visit(ctx->unaryExp());
-    } else {
+    // 判断是否是二元运算：检查是否有运算符
+    if (ctx->MUL() || ctx->DIV() || ctx->MOD()) {
         visit(ctx->mulExp());
         formattedCode << " ";
         if (ctx->MUL()) formattedCode << "*";
@@ -423,17 +468,22 @@ std::any SysYFormatter::visitMulExp(SysYParser::MulExpContext *ctx) {
         else formattedCode << "%";
         formattedCode << " ";
         visit(ctx->unaryExp());
+    } else {
+        // 只有一个 unaryExp
+        visit(ctx->unaryExp());
     }
     return nullptr;
 }
 
 // 访问加减表达式
 std::any SysYFormatter::visitAddExp(SysYParser::AddExpContext *ctx) {
-    if (ctx->mulExp()) {
-        visit(ctx->mulExp());
-    } else {
+    // 判断是否是二元运算：检查是否有运算符
+    if (ctx->PLUS() || ctx->MINUS()) {
         visit(ctx->addExp());
         formattedCode << " " << (ctx->PLUS() ? "+" : "-") << " ";
+        visit(ctx->mulExp());
+    } else {
+        // 只有一个 mulExp
         visit(ctx->mulExp());
     }
     return nullptr;
@@ -441,9 +491,8 @@ std::any SysYFormatter::visitAddExp(SysYParser::AddExpContext *ctx) {
 
 // 访问关系表达式
 std::any SysYFormatter::visitRelExp(SysYParser::RelExpContext *ctx) {
-    if (ctx->addExp()) {
-        visit(ctx->addExp());
-    } else {
+    // 判断是否是二元运算：检查是否有运算符
+    if (ctx->LT() || ctx->GT() || ctx->LE() || ctx->GE()) {
         visit(ctx->relExp());
         formattedCode << " ";
         if (ctx->LT()) formattedCode << "<";
@@ -452,20 +501,25 @@ std::any SysYFormatter::visitRelExp(SysYParser::RelExpContext *ctx) {
         else formattedCode << ">=";
         formattedCode << " ";
         visit(ctx->addExp());
+    } else {
+        // 只有一个 addExp
+        visit(ctx->addExp());
     }
     return nullptr;
 }
 
 // 访问相等表达式
 std::any SysYFormatter::visitEqExp(SysYParser::EqExpContext *ctx) {
-    if (ctx->relExp()) {
-        visit(ctx->relExp());
-    } else {
+    // 判断是否是二元运算：检查是否有运算符
+    if (ctx->EQ() || ctx->NEQ()) {
         visit(ctx->eqExp());
         formattedCode << " ";
         if (ctx->EQ()) formattedCode << "==";
         else formattedCode << "!=";
         formattedCode << " ";
+        visit(ctx->relExp());
+    } else {
+        // 只有一个 relExp
         visit(ctx->relExp());
     }
     return nullptr;
@@ -473,11 +527,13 @@ std::any SysYFormatter::visitEqExp(SysYParser::EqExpContext *ctx) {
 
 // 访问逻辑与表达式
 std::any SysYFormatter::visitLAndExp(SysYParser::LAndExpContext *ctx) {
-    if (ctx->eqExp()) {
-        visit(ctx->eqExp());
-    } else {
+    // 判断是否是二元运算：检查是否有运算符
+    if (ctx->AND()) {
         visit(ctx->lAndExp());
         formattedCode << " && ";
+        visit(ctx->eqExp());
+    } else {
+        // 只有一个 eqExp
         visit(ctx->eqExp());
     }
     return nullptr;
@@ -485,16 +541,17 @@ std::any SysYFormatter::visitLAndExp(SysYParser::LAndExpContext *ctx) {
 
 // 访问逻辑或表达式
 std::any SysYFormatter::visitLOrExp(SysYParser::LOrExpContext *ctx) {
-    if (ctx->lAndExp()) {
-        visit(ctx->lAndExp());
-    } else {
+    // 判断是否是二元运算：检查是否有运算符
+    if (ctx->OR()) {
         visit(ctx->lOrExp());
         formattedCode << " || ";
+        visit(ctx->lAndExp());
+    } else {
+        // 只有一个 lAndExp
         visit(ctx->lAndExp());
     }
     return nullptr;
 }
-
 // 访问常量表达式
 std::any SysYFormatter::visitConstExp(SysYParser::ConstExpContext *ctx) {
     visit(ctx->addExp());
