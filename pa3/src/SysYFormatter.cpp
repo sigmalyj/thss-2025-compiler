@@ -290,9 +290,9 @@ std::any SysYFormatter::visitBlockItem(SysYParser::BlockItemContext *ctx) {
 // ==================== 语句规则 ====================
 
 // 访问语句
+// 访问语句
 std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
     if (ctx->block()) {
-        // block 自己会处理缩进
         visit(ctx->block());
     } else if (ctx->lVal()) {
         addIndent();
@@ -316,7 +316,6 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
         visit(ctx->cond());
         formattedCode << ")";
         
-        // 处理 if 后的语句
         auto *thenStmt = ctx->stmt(0);
         if (thenStmt->block()) {
             addSpace();
@@ -328,21 +327,21 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
             --indentLevel;
         }
         
-        // 处理 else 分支
-        if (ctx->ELSE()) {
+        // 使用循环处理 else if 链，避免递归
+        auto *currentCtx = ctx;
+        while (currentCtx->ELSE()) {
+            auto *elseStmt = currentCtx->stmt(1);
+            
             addIndent();
             formattedCode << "else";
-            auto *elseStmt = ctx->stmt(1);
-            if (elseStmt->block()) {
-                addSpace();
-                visit(elseStmt);
-            } else if (elseStmt->IF()) {
-                // 不直接 visit(elseStmt)，改为内联处理 "else if"，
-                // 以避免 visit(elseStmt) 内部再次 addIndent() 导致多余缩进
+            
+            if (elseStmt->IF()) {
+                // else if 情况
                 addSpace();
                 formattedCode << "if (";
                 visit(elseStmt->cond());
                 formattedCode << ")";
+                
                 auto *thenStmt2 = elseStmt->stmt(0);
                 if (thenStmt2->block()) {
                     addSpace();
@@ -353,30 +352,24 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
                     visit(thenStmt2);
                     --indentLevel;
                 }
-                // 若内层 if 自带 else，则递归或按需处理
-                if (elseStmt->ELSE()) {
-                    // 将内层 else 同样按上面的方式处理（可递归实现）
-                    addIndent();
-                    formattedCode << "else";
-                    auto *innerElse = elseStmt->stmt(1);
-                    if (innerElse->block()) {
-                        addSpace();
-                        visit(innerElse);
-                    } else {
-                        addNewline();
-                        ++indentLevel;
-                        visit(innerElse);
-                        --indentLevel;
-                    }
-                }
+                
+                // 继续检查是否有更多的 else if
+                currentCtx = elseStmt;
             } else {
-                addNewline();
-                ++indentLevel;
-                visit(elseStmt);
-                --indentLevel;
+                // 最后的 else 分支
+                if (elseStmt->block()) {
+                    addSpace();
+                    visit(elseStmt);
+                } else {
+                    addNewline();
+                    ++indentLevel;
+                    visit(elseStmt);
+                    --indentLevel;
+                }
+                break; // 结束循环
             }
         }
-        } else if (ctx->WHILE()) {
+    } else if (ctx->WHILE()) {
         addIndent();
         formattedCode << "while (";
         visit(ctx->cond());
@@ -412,7 +405,6 @@ std::any SysYFormatter::visitStmt(SysYParser::StmtContext *ctx) {
     }
     return nullptr;
 }
-
 // ==================== 表达式规则 ====================
 
 // 访问表达式
